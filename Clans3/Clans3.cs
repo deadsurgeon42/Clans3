@@ -461,7 +461,7 @@ namespace Clans3
                         return;
                     }
 
-                    else if (input.Contains("[c/") || input.Contains("[i"))
+                    else if (input.Contains("[c/") || input.Contains("[C/") || input.Contains("[I") || input.Contains("[i"))
                     {
                         args.Player.SendErrorMessage("You cannot use item/color tags in clan prefixes!");
                         return;
