@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Data;
 using System.Linq;
 using System.Timers;
 using Terraria;
@@ -15,7 +14,7 @@ namespace Clans3
         public override string Name { get { return "Clans3"; } }
         public override string Author { get { return "Zaicon"; } }
         public override string Description { get { return "Clan Plugin for TShock"; } }
-        public override Version Version { get { return new Version(1, 3, 0, 0); } }
+        public override Version Version { get { return new Version(1, 3, 1, 0); } }
         
         public static List<Clan> clans;
 
@@ -34,7 +33,7 @@ namespace Clans3
 
             ServerApi.Hooks.GameInitialize.Register(this, OnInitialize);
             ServerApi.Hooks.ServerChat.Register(this, onChat);
-           
+            ServerApi.Hooks.NetGreetPlayer.Register(this, onGreet);
         }
 
         protected override void Dispose(bool disposing)
@@ -43,6 +42,7 @@ namespace Clans3
             {
                 ServerApi.Hooks.GameInitialize.Deregister(this, OnInitialize);
                 ServerApi.Hooks.ServerChat.Deregister(this, onChat);
+                ServerApi.Hooks.NetGreetPlayer.Deregister(this, onGreet);
             }
             base.Dispose(disposing);
         }
@@ -87,6 +87,21 @@ namespace Clans3
                     }
                 }
             }
+        }
+
+        private void onGreet(GreetPlayerEventArgs args)
+        {
+            var plr = TShock.Players[args.Who];
+            if (plr == null || plr.Active == false)
+                return;
+
+            int clanindex = findClan(plr.User.ID);
+
+            if (clanindex == -1)
+                return;
+
+            //Saves clan prefix to tsplayer object, which can be read by other plugins (intended for bridge plugin atm)
+            plr.SetData<string>("clan", clans[clanindex].prefix);
         }
 
         private void onChat(ServerChatEventArgs args)
@@ -169,6 +184,7 @@ namespace Clans3
                     //If player is owner of the clan, pass ownership if possible
                     if (clans[clanindex].owner == args.Player.User.ID)
                     {
+                        args.Player.RemoveData("clan");
                         if (clans[clanindex].admins.Count > 0)
                         {
                             clans[clanindex].owner = clans[clanindex].admins[0];
@@ -207,6 +223,7 @@ namespace Clans3
                     //If player is not owner of the clan
                     else
                     {
+                        args.Player.RemoveData("clan");
                         //If player is admin
                         if (clans[clanindex].admins.Contains(args.Player.User.ID))
                         {
@@ -340,6 +357,7 @@ namespace Clans3
                         }
                         TShock.Log.Info($"{args.Player.User.Name} accepted the invite to join the {clans[iclanindex].name} clan.");
                         DB.changeMembers(clans[iclanindex].owner, clans[iclanindex]);
+                        args.Player.SetData<string>("clan", clans[iclanindex].prefix);
                     }
                 }
             }
@@ -461,7 +479,7 @@ namespace Clans3
                         return;
                     }
 
-                    else if (input.Contains("[c/") || input.Contains("[C/") || input.Contains("[I") || input.Contains("[i"))
+                    else if (input.ToLower().Contains("[c") || input.ToLower().Contains("[i") || input.ToLower().Contains("[g"))
                     {
                         args.Player.SendErrorMessage("You cannot use item/color tags in clan prefixes!");
                         return;
@@ -476,6 +494,17 @@ namespace Clans3
                     DB.clanPrefix(args.Player.User.ID, input);
                     args.Player.SendSuccessMessage($"Successfully changed the clan prefix to \"{input}\"!");
                     TShock.Log.Info($"{args.Player.User.Name} changed the {clans[clanindex].name} clan's prefix to \"{input}\".");
+
+                    foreach(TSPlayer plr in TShock.Players)
+                    {
+                        if (plr != null && plr.IsLoggedIn)
+                        {
+                            if (findClan(plr.User.ID) == clanindex)
+                            {
+                                plr.SetData<string>("clan", clans[clanindex].prefix);
+                            }
+                        }
+                    }
                     return;
                 }
                 #endregion
@@ -587,6 +616,8 @@ namespace Clans3
                     DB.changeMembers(clans[clanindex].owner, clans[clanindex]);
                     TShock.Log.Info($"{args.Player.User.Name} joined the {clans[clanindex].name} clan.");
                     args.Player.SendSuccessMessage($"You have joined the {clans[clanindex].name} clan!");
+
+                    args.Player.SetData<string>("clan", clans[clanindex].prefix);
                     return;
                 }
                 #endregion
@@ -664,6 +695,7 @@ namespace Clans3
                     args.Player.SendSuccessMessage($"You have removed {plr.Name} from your clan!");
                     plr.SendInfoMessage($"You have been kicked out of {clans[clanindex].name} by {args.Player.Name}!");
                     TShock.Log.Info($"{args.Player.User.Name} removed {plr.Name} from the {clans[clanindex].name} clan.");
+                    plr.RemoveData("clan");
                     return;
                 }
                 #endregion
@@ -745,6 +777,7 @@ namespace Clans3
                     args.Player.SendSuccessMessage($"You have banned {plr.Name} from your clan!");
                     plr.SendInfoMessage($"You have been banned from {clans[clanindex].name} by {args.Player.Name}!");
                     TShock.Log.Info($"{args.Player.User.Name} banned {plr.Name} from the {clans[clanindex].name} clan.");
+                    plr.RemoveData("clan");
                     return;
                 }
                 //Clan Unban
@@ -1210,7 +1243,7 @@ namespace Clans3
                     {
                         string prefix = args.Parameters[2];
 
-                        if (prefix.Contains("[i") || prefix.Contains("[c"))
+                        if (prefix.ToLower().Contains("[i") || prefix.ToLower().Contains("[c") || prefix.ToLower().Contains("[g"))
                         {
                             args.Player.SendErrorMessage("You cannot add item/color tags in clan prefixes!");
                         }
@@ -1224,6 +1257,17 @@ namespace Clans3
                             DB.clanPrefix(clans[clanindexlist[0]].owner, prefix);
                             args.Player.SendSuccessMessage($"Successfully changed the clan prefix of the {clans[clanindexlist[0]].name} clan to \"{prefix}\".");
                             TShock.Log.Info($"{args.Player.User.Name} changed the {clans[clanindexlist[0]].name} clan prefix to \"{prefix}\".");
+
+                            foreach (TSPlayer plr in TShock.Players)
+                            {
+                                if (plr != null && plr.IsLoggedIn)
+                                {
+                                    if (findClan(plr.User.ID) == clanindexlist[0])
+                                    {
+                                        plr.SetData<string>("clan", clans[clanindexlist[0]].prefix);
+                                    }
+                                }
+                            }
                         } //end if (prefix.Contains("[i") || prefix.Contains("[c"))
                     } //end if (clanindexlist.Count == 0)
                 } //end if (type == "prefix" && args.Parameters.Count == 3)
@@ -1249,6 +1293,16 @@ namespace Clans3
                     {
                         args.Player.SendSuccessMessage($"Successfully removed the {clans[clanindexlist[0]].name} clan.");
                         TShock.Log.Info($"{args.Player.User.Name} removed the {clans[clanindexlist[0]].name} clan.");
+                        foreach (TSPlayer plr in TShock.Players)
+                        {
+                            if (plr != null && plr.IsLoggedIn)
+                            {
+                                if (findClan(plr.User.ID) == clanindexlist[0])
+                                {
+                                    plr.RemoveData("clan");
+                                }
+                            }
+                        }
                         DB.removeClan(clans[clanindexlist[0]].owner);
                         clans.Remove(clans[clanindexlist[0]]);
                     }
