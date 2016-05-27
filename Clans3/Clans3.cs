@@ -8,7 +8,7 @@ using TShockAPI;
 
 namespace Clans3
 {
-    [ApiVersion(1,22)]
+    [ApiVersion(1,23)]
     public class Clans3 : TerrariaPlugin
     {
         public override string Name { get { return "Clans3"; } }
