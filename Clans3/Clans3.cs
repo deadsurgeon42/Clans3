@@ -94,6 +94,8 @@ namespace Clans3
             var plr = TShock.Players[args.Who];
             if (plr == null || plr.Active == false)
                 return;
+            if (!plr.IsLoggedIn)
+                return;
 
             int clanindex = findClan(plr.User.ID);
 
