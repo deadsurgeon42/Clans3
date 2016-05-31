@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Timers;
 using Terraria;
 using TerrariaApi.Server;
@@ -8,13 +9,13 @@ using TShockAPI;
 
 namespace Clans3
 {
-    [ApiVersion(1,23)]
+    [ApiVersion(1,24)]
     public class Clans3 : TerrariaPlugin
     {
         public override string Name { get { return "Clans3"; } }
         public override string Author { get { return "Zaicon"; } }
         public override string Description { get { return "Clan Plugin for TShock"; } }
-        public override Version Version { get { return new Version(1, 3, 1, 0); } }
+        public override Version Version { get { return Assembly.GetExecutingAssembly().GetName().Version; } }
         
         public static List<Clan> clans;
 
@@ -484,6 +485,11 @@ namespace Clans3
                     else if (input.ToLower().Contains("[c") || input.ToLower().Contains("[i") || input.ToLower().Contains("[g"))
                     {
                         args.Player.SendErrorMessage("You cannot use item/color tags in clan prefixes!");
+                        return;
+                    }
+                    else if (input.ToLower().Contains("slack"))
+                    {
+                        args.Player.SendErrorMessage("You cannot use 'slack' in clan prefixes!");
                         return;
                     }
                     else if (input.Length > 20)
@@ -1249,6 +1255,11 @@ namespace Clans3
                         {
                             args.Player.SendErrorMessage("You cannot add item/color tags in clan prefixes!");
                         }
+                        else if (prefix.ToLower().Contains("slack"))
+                        {
+                            args.Player.SendErrorMessage("You cannot use 'slack' in clan prefixes!");
+                            return;
+                        }
                         else if (prefix.Length > 20)
                         {
                             args.Player.SendErrorMessage("Prefix length too long!");
@@ -1350,7 +1361,7 @@ namespace Clans3
             TShock.Log.Info($"{args.Player.User.Name} reloaded Clans database.");
         }
 
-        private int findClan(int userid)
+        public static int findClan(int userid)
         {
             if (userid == -1)
                 return -1;
