@@ -100,15 +100,6 @@ namespace Clans3
                     });
                 }
             }
-            foreach (TSPlayer plr in TShock.Players)
-            {
-                if (plr == null || !plr.IsLoggedIn)
-                    return;
-                int i = Clans3.findClan(plr.User.ID);
-                if (i == -1)
-                    return;
-                plr.SetData<string>("clan", Clans3.clans[i].prefix);
-            }
         }
 
         public static void removeClan(int owner)
