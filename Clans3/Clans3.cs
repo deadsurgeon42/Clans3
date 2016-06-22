@@ -17,6 +17,7 @@ namespace Clans3
         public override Version Version { get { return new Version(1, 3, 1, 0); } }
         
         public static List<Clan> clans;
+		public static Dictionary<int, List<int>> ignores;
 
         public static Timer invitebc;
 
@@ -62,7 +63,9 @@ namespace Clans3
             Commands.ChatCommands.Add(new Command("clans.use", CChat, "c"));
             Commands.ChatCommands.Add(new Command("clans.reload", CReload, "clanreload"));
             Commands.ChatCommands.Add(new Command("clans.mod", ClansStaff, "clanstaff", "cs"));
-        }
+			Commands.ChatCommands.Add(new Command("ignore.use", Ignore, "ignore"));
+
+		}
 
         private void onUpdate(object sender, ElapsedEventArgs e)
         {
@@ -110,15 +113,41 @@ namespace Clans3
         {
             TSPlayer plr = TShock.Players[args.Who];
 
-            if (plr == null || !plr.Active || args.Handled || !plr.IsLoggedIn || args.Text.StartsWith(TShock.Config.CommandSpecifier) || args.Text.StartsWith(TShock.Config.CommandSilentSpecifier) || findClan(plr.User.ID) == -1 || plr.mute)
-            {
-                return;
-            }
+			if (plr == null || !plr.Active || args.Handled || args.Text.StartsWith(TShock.Config.CommandSpecifier) || args.Text.StartsWith(TShock.Config.CommandSilentSpecifier) || plr.mute)
+			{
+				return;
+			}
 
-            int clanindex = findClan(plr.User.ID);
-            string prefix = clans[clanindex].prefix == "" ? plr.Group.Prefix : "(" + clans[clanindex].prefix + ") " + plr.Group.Prefix;
+			int clanindex;
+			string prefix;
 
-            TSPlayer.All.SendMessage(string.Format(TShock.Config.ChatFormat, plr.Group.Name, prefix, plr.Name, plr.Group.Suffix, args.Text), new Color(plr.Group.R, plr.Group.G, plr.Group.B));
+			if (!plr.IsLoggedIn)
+			{
+				prefix = plr.Group.Prefix;
+			}
+			else
+			{
+				clanindex = findClan(plr.User.ID);
+				prefix = clans[clanindex].prefix == "" ? plr.Group.Prefix : "(" + clans[clanindex].prefix + ") " + plr.Group.Prefix;
+			}
+
+			foreach(TSPlayer player in TShock.Players)
+			{
+				if (player == null)
+					continue;
+				//Ignore Player
+				else if (player.IsLoggedIn && plr.IsLoggedIn && ignores.ContainsKey(player.User.ID) && ignores[player.User.ID].Contains(plr.User.ID))
+					continue;
+				//Ignore All Non-Logged In Users
+				else if (!plr.IsLoggedIn && player.IsLoggedIn && ignores.ContainsKey(player.User.ID) && ignores[player.User.ID].Contains(-1))
+					continue;
+				//Ignore All Except Staff
+				else if (player.IsLoggedIn && ignores.ContainsKey(player.User.ID) && ignores[player.User.ID].Contains(-2) && !plr.HasPermission("ignore.immune"))
+					continue;
+				else
+					player.SendMessage(string.Format(TShock.Config.ChatFormat, plr.Group.Name, prefix, plr.Name, plr.Group.Suffix, args.Text), new Color(plr.Group.R, plr.Group.G, plr.Group.B));
+			}
+			
             TSPlayer.Server.SendMessage(string.Format(TShock.Config.ChatFormat, plr.Group.Name, prefix, plr.Name, plr.Group.Suffix, args.Text), new Color(plr.Group.R, plr.Group.G, plr.Group.B));
 
             args.Handled = true;
@@ -1340,6 +1369,115 @@ namespace Clans3
                     plr.SendMessage($"(Clanchat) [{args.Player.Name}]: {string.Join(" ", args.Parameters)}", Color.ForestGreen);
             }
         }
+
+		private void Ignore(CommandArgs args)
+		{
+			int userid = args.Player.User.ID;
+
+			if (args.Parameters.Count == 1 && args.Parameters[0].ToLower() == "-a")
+			{
+				if (!ignores.ContainsKey(userid))
+				{
+					ignores.Add(args.Player.User.ID, new List<int>() { -2 });
+					args.Player.SendSuccessMessage("You are now ignoring all players.");
+				}
+				else if (ignores.ContainsKey(userid) && !ignores[userid].Contains(-2))
+				{
+					ignores[userid].Add(-2);
+					args.Player.SendSuccessMessage("You are now ignoring all players.");
+				}
+				else
+				{
+					ignores[userid].Remove(-2);
+					args.Player.SendSuccessMessage("You are no longer ignoring all players.");
+				}
+				return;
+			}
+			else if (args.Parameters.Count == 1 && args.Parameters[0].ToLower() == "-r")
+			{
+				if (!ignores.ContainsKey(userid))
+				{
+					ignores.Add(args.Player.User.ID, new List<int>() { -1 });
+					args.Player.SendSuccessMessage("You are now ignoring un-registered players.");
+				}
+				else if (ignores.ContainsKey(userid) && !ignores[userid].Contains(-1))
+				{
+					ignores[userid].Add(-1);
+					args.Player.SendSuccessMessage("You are now ignoring un-registered players.");
+				}
+				else
+				{
+					ignores[userid].Remove(-1);
+					args.Player.SendSuccessMessage("You are no longer ignoring un-registered players.");
+				}
+				return;
+			}
+			else if (args.Parameters.Count == 1 && args.Parameters[0].ToLower() == "-s")
+			{
+				if (args.Player.ContainsData("slackignore"))
+				{
+					args.Player.RemoveData("slackignore");
+					args.Player.SendSuccessMessage("You are no longer ignoring Slack chat.");
+				}
+				else
+				{
+					args.Player.SetData<bool>("slackignore", true);
+					args.Player.SendSuccessMessage("You are now ignoring Slack chat.");
+				}
+			}
+			else if (args.Parameters.Count == 1)
+			{
+				string name = args.Parameters[0];
+				var plist = TShock.Utils.FindPlayer(name);
+
+				if (plist.Count == 0)
+				{
+					args.Player.SendErrorMessage("No player found by the name " + name);
+					return;
+				}
+				else if (plist.Count > 1)
+				{
+					TShock.Utils.SendMultipleMatchError(args.Player, plist.Select(p => p.Name));
+					return;
+				}
+				else if (!plist[0].IsLoggedIn)
+				{
+					args.Player.SendErrorMessage("You cannot ignore individual un-registered players.");
+					return;
+				}
+
+				int iuserid = plist[0].User.ID;
+				
+				if (ignores.ContainsKey(userid))
+				{
+					if (ignores[userid].Contains(iuserid))
+					{
+						ignores[userid].Remove(iuserid);
+						args.Player.SendSuccessMessage("You are no longer ignoring " + plist[0].Name);
+						return;
+					}
+					else
+					{
+						ignores[userid].Add(iuserid);
+						args.Player.SendSuccessMessage("You are now ignoring " + plist[0].Name);
+						return;
+					}
+				}
+				else
+				{
+					ignores.Add(userid, new List<int>() { iuserid });
+					args.Player.SendSuccessMessage("You are now ignoring " + plist[0].Name);
+					return;
+				}
+			}
+			else
+			{
+				args.Player.SendErrorMessage("Invalid syntax:");
+				args.Player.SendErrorMessage("/ignore <-r/-s/-a/player name>");
+				args.Player.SendErrorMessage("'-r' ignores un-registered players; '-s' ignores Slack chat; '-a' ignores all non-staff players");
+				return;
+			}
+		}
         #endregion
 
         #region Support
