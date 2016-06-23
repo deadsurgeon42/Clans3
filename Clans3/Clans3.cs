@@ -58,6 +58,7 @@ namespace Clans3
             invitebc = new Timer(300000) { AutoReset = true, Enabled = true }; //5 min
             invitebc.Elapsed += onUpdate;
 
+			ignores = new Dictionary<int, List<int>>();
 
             Commands.ChatCommands.Add(new Command("clans.use", ClansMain, "clan"));
             Commands.ChatCommands.Add(new Command("clans.use", CChat, "c"));
