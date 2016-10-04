@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Timers;
 using Terraria;
 using TerrariaApi.Server;
@@ -8,13 +9,13 @@ using TShockAPI;
 
 namespace Clans3
 {
-    [ApiVersion(1,23)]
+    [ApiVersion(1,25)]
     public class Clans3 : TerrariaPlugin
     {
         public override string Name { get { return "Clans3"; } }
         public override string Author { get { return "Zaicon"; } }
         public override string Description { get { return "Clan Plugin for TShock"; } }
-        public override Version Version { get { return new Version(1, 3, 1, 0); } }
+        public override Version Version { get { return Assembly.GetExecutingAssembly().GetName().Version; } }
         
         public static List<Clan> clans;
 		public static Dictionary<int, List<int>> ignores;
@@ -24,7 +25,7 @@ namespace Clans3
         public Clans3(Main game)
             :base(game)
         {
-            base.Order = 1;
+			Order = 1;
         }
 
         #region Init/Dispose
