@@ -3,13 +3,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Timers;
+using Microsoft.Xna.Framework;
 using Terraria;
 using TerrariaApi.Server;
 using TShockAPI;
 
 namespace Clans3
 {
-    [ApiVersion(1,25)]
+    [ApiVersion(2,0)]
     public class Clans3 : TerrariaPlugin
     {
         public override string Name { get { return "Clans3"; } }
